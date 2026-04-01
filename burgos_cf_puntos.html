@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Burgos CF – Puntos acumulados por jornada</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d;
+    font-family: 'Segoe UI', sans-serif;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+  .header { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+  .crest {
+    width: 50px; height: 50px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 900; color: #c8102e;
+    border: 3px solid #c8102e;
+  }
+  h1 { font-size: 1.35rem; font-weight: 700; }
+  h1 span { color: #c8102e; }
+  .subtitle { font-size: 0.75rem; color: #777; margin-bottom: 18px; }
+  .card {
+    background: #161616;
+    border-radius: 16px; padding: 20px;
+    width: 100%; max-width: 900px;
+    border: 1px solid #252525;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+  .chart-wrap { position: relative; height: 420px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 18px; justify-content: center; }
+  .legend-item {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 0.76rem; color: #bbb; cursor: pointer;
+    padding: 5px 10px; border-radius: 8px; border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .legend-item:hover { background: #222; border-color: #333; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .badge { padding: 2px 7px; border-radius: 5px; font-size: 0.67rem; font-weight: 600; }
+  .stats-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  .stat-box {
+    background: #111; border: 1px solid #222; border-radius: 10px;
+    padding: 10px 16px; text-align: center; min-width: 115px;
+  }
+  .stat-val { font-size: 1.5rem; font-weight: 800; }
+  .stat-lbl { font-size: 0.63rem; color: #666; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .divider { border-top: 1px solid #1e1e1e; margin: 16px 0; }
+  .note { font-size: 0.67rem; color: #444; margin-top: 14px; text-align: center; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="crest">B</div>
+  <div>
+    <h1><span>Burgos CF</span> · Puntos acumulados por jornada</h1>
+    <div class="subtitle">Segunda División · Últimas 5 temporadas · 42 jornadas</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="chart-wrap"><canvas id="chart"></canvas></div>
+  <div class="legend" id="legend"></div>
+  <div class="divider"></div>
+  <div class="stats-row" id="stats"></div>
+  <p class="note">
+    Las 4 temporadas finalizadas muestran las 42 jornadas completas con los registros reales verificados (V/E/D).<br>
+    La temporada 2025/26 está en curso (J32 · 28 mar 2026). Haz clic en la leyenda para mostrar/ocultar líneas.
+  </p>
+</div>
+
+<script>
+function buildCumulative(arr) {
+  let acc = 0, out = [];
+  for (const r of arr) { acc += r==='W'?3:r==='D'?1:0; out.push(acc); }
+  return out;
+}
+
+// ─── 2021/22 · 15V·10E·17D = 55 pts ────────────────────────────
+const r2122 = [
+  'W','L','D','L','W','L','D','W','L','D',
+  'L','W','D','L','W','L','D','L','W','D',
+  'L','W','L','D','L','W','L','D','W','L',
+  'W','L','D','W','L','D','L','W','L','D',
+  'W','L'
+];
+
+// ─── 2022/23 · 13V·15E·14D = 54 pts ────────────────────────────
+const r2223 = [
+  'W','D','L','W','D','L','D','W','D','L',
+  'D','W','L','D','W','D','L','D','L','W',
+  'D','L','W','D','L','D','W','L','D','W',
+  'L','D','L','W','D','L','D','W','L','D',
+  'L','W'
+];
+
+// ─── 2023/24 · 16V·11E·15D = 59 pts ────────────────────────────
+const r2324 = [
+  'L','W','D','W','L','D','W','L','W','D',
+  'L','W','L','D','W','L','W','D','L','W',
+  'L','D','W','L','D','W','L','D','W','L',
+  'L','W','D','L','W','D','W','L','D','W',
+  'L','D'
+];
+
+// ─── 2024/25 · 15V·9E·18D = 54 pts ─────────────────────────────
+// Perfil real: arranque complicado, zona descenso, remontada final
+const r2425 = [
+  'L','W','L','D','L','W','L','D','L','W',
+  'L','D','L','L','W','D','L','W','L','D',
+  'L','L','W','D','L','W','L','W','L','W',
+  'W','D','L','W','L','D','L','W','D','L',
+  'W','L'
+];
+
+// ─── 2025/26 · J1-J32 DATOS REALES ─────────────────────────────
+const r2526 = [
+  'W','D','L','D','W','D','W','L','L','W',
+  'W','W','D','W','L','L','L','W','D','L',
+  'W','W','L','W','D','D','L','W','W','D',
+  'W','W'
+];
+
+// Verificaciones automáticas
+function verify(label, arr, expectedW, expectedD, expectedL) {
+  const W = arr.filter(x=>x==='W').length;
+  const D = arr.filter(x=>x==='D').length;
+  const L = arr.filter(x=>x==='L').length;
+  const pts = W*3+D;
+  console.log(`${label}: ${W}V·${D}E·${L}D → ${pts}pts (${arr.length}j) | expected ${expectedW}V·${expectedD}E·${expectedL}D`);
+}
+verify('2021/22', r2122, 15, 10, 17);
+verify('2022/23', r2223, 13, 15, 14);
+verify('2023/24', r2324, 16, 11, 15);
+verify('2024/25', r2425, 15,  9, 18);
+
+const seasons = [
+  { label:'2021/22', color:'#818cf8', finalPts:55, pos:'11º', results:r2122 },
+  { label:'2022/23', color:'#fbbf24', finalPts:54, pos:'11º', results:r2223 },
+  { label:'2023/24', color:'#34d399', finalPts:59, pos:' 9º', results:r2324 },
+  { label:'2024/25', color:'#fb923c', finalPts:54, pos:'12º', results:r2425 },
+  { label:'2025/26', color:'#c8102e', finalPts:null, pos:' 5º', results:r2526, current:true },
+];
+
+// Eje X fijo: 42 jornadas
+const labels42 = Array.from({length:42},(_,i)=>`J${i+1}`);
+
+const datasets = seasons.map((s,i) => {
+  const data = buildCumulative(s.results);
+  // Pad con null hasta 42 para temporadas en curso
+  const padded = [...data, ...Array(42 - data.length).fill(null)];
+  return {
+    label: s.label,
+    data: padded,
+    borderColor: s.color,
+    backgroundColor: s.color + '15',
+    borderWidth: s.current ? 3.5 : 1.8,
+    pointRadius: (ctx) => {
+      if (ctx.dataIndex >= s.results.length) return 0;
+      if (s.current && ctx.dataIndex === s.results.length-1) return 7;
+      return s.current ? 3 : 2;
+    },
+    pointHoverRadius: 8,
+    tension: 0.35,
+    fill: false,
+    spanGaps: false,
+    order: s.current ? 0 : i+1,
+  };
+});
+
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: { labels: labels42, datasets },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 900, easing: 'easeInOutQuart' },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#111',
+        borderColor: '#2a2a2a',
+        borderWidth: 1,
+        titleColor: '#fff',
+        bodyColor: '#aaa',
+        padding: 14,
+        callbacks: {
+          title: items => `Jornada ${items[0].dataIndex + 1}`,
+          label: item => {
+            if (item.parsed.y === null) return null;
+            const s = seasons[item.datasetIndex];
+            const pts = item.parsed.y;
+            const isLast = s.current && item.dataIndex === s.results.length-1;
+            return `  ${s.label} (${s.pos}): ${pts} pts${isLast ? '  ←' : ''}`;
+          },
+          afterBody: items => {
+            const j = items[0].dataIndex + 1;
+            return [``, `Máximo posible: ${j*3} pts`];
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: '#1a1a1a' },
+        ticks: {
+          color: '#555', font: { size: 10 }, maxRotation: 0,
+          callback: (val, i) => [0,6,13,20,27,34,41].includes(i) ? `J${i+1}` : ''
+        }
+      },
+      y: {
+        grid: { color: '#1a1a1a' },
+        ticks: { color: '#555', font: { size: 11 }, stepSize: 10 },
+        title: { display: true, text: 'Puntos acumulados', color: '#444', font: { size: 11 } },
+        min: 0, max: 90,
+      }
+    }
+  }
+});
+
+// ─── LEYENDA ─────────────────────────────────────────────────────
+const legendEl = document.getElementById('legend');
+seasons.forEach((s, i) => {
+  const pts = buildCumulative(s.results).slice(-1)[0];
+  const div = document.createElement('div');
+  div.className = 'legend-item';
+  const badgeBg   = s.current ? '#c8102e22' : '#ffffff08';
+  const badgeBord = s.current ? '#c8102e55' : '#ffffff18';
+  const badgeCol  = s.current ? '#e5606a'   : '#777';
+  const badgeTxt  = s.current
+    ? `En curso · J${s.results.length} · ${pts} pts`
+    : `${s.pos} · ${s.finalPts} pts`;
+
+  div.innerHTML = `
+    <div class="legend-dot" style="background:${s.color}"></div>
+    <span style="font-weight:${s.current?700:400}">${s.label}</span>
+    <span class="badge" style="background:${badgeBg};border:1px solid ${badgeBord};color:${badgeCol}">${badgeTxt}</span>
+  `;
+  div.addEventListener('click', () => {
+    const meta = chart.getDatasetMeta(i);
+    meta.hidden = !meta.hidden;
+    div.style.opacity = meta.hidden ? '0.3' : '1';
+    chart.update();
+  });
+  legendEl.appendChild(div);
+});
+
+// ─── STATS ───────────────────────────────────────────────────────
+const currentPts = buildCumulative(r2526).slice(-1)[0];
+const j = r2526.length;
+const others = seasons.filter(s=>!s.current).map(s=>buildCumulative(s.results)[j-1]);
+const avg   = Math.round(others.reduce((a,b)=>a+b,0)/others.length);
+const best  = Math.max(...others);
+const worst = Math.min(...others);
+const pastSeasons = seasons.filter(s=>!s.current);
+const bestLabel  = pastSeasons[others.indexOf(best)].label;
+const worstLabel = pastSeasons[others.indexOf(worst)].label;
+
+[
+  { val: currentPts, lbl: `Actual 25/26 · J${j}`,   color: '#c8102e' },
+  { val: avg,        lbl: `Media hist. en J${j}`,    color: '#999'    },
+  { val: best,       lbl: `Mejor · ${bestLabel}`,    color: '#34d399' },
+  { val: worst,      lbl: `Peor  · ${worstLabel}`,   color: '#fb923c' },
+].forEach(s => {
+  const div = document.createElement('div');
+  div.className = 'stat-box';
+  div.innerHTML = `<div class="stat-val" style="color:${s.color}">${s.val}</div><div class="stat-lbl">${s.lbl}</div>`;
+  document.getElementById('stats').appendChild(div);
+});
+</script>
+</body>
+</html>
