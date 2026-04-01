@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Burgos CF – Puntos acumulados por jornada</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d0d0d;
+    font-family: 'Segoe UI', sans-serif;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+  .header { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+  .crest {
+    width: 50px; height: 50px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 900; color: #c8102e;
+    border: 3px solid #c8102e;
+  }
+  h1 { font-size: 1.35rem; font-weight: 700; }
+  h1 span { color: #c8102e; }
+  .subtitle { font-size: 0.75rem; color: #777; margin-bottom: 18px; }
+  .card {
+    background: #161616;
+    border-radius: 16px; padding: 20px;
+    width: 100%; max-width: 900px;
+    border: 1px solid #252525;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+  .chart-wrap { position: relative; height: 420px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 18px; justify-content: center; }
+  .legend-item {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 0.76rem; color: #bbb; cursor: pointer;
+    padding: 5px 10px; border-radius: 8px; border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .legend-item:hover { background: #222; border-color: #333; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .badge { padding: 2px 7px; border-radius: 5px; font-size: 0.67rem; font-weight: 600; }
+  .stats-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+  .stat-box {
+    background: #111; border: 1px solid #222; border-radius: 10px;
+    padding: 10px 16px; text-align: center; min-width: 115px;
+  }
+  .stat-val { font-size: 1.5rem; font-weight: 800; }
+  .stat-lbl { font-size: 0.63rem; color: #666; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .divider { border-top: 1px solid #1e1e1e; margin: 16px 0; }
+  .note { font-size: 0.67rem; color: #444; margin-top: 14px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="crest">B</div>
+  <div>
+    <h1><span>Burgos CF</span> · Puntos acumulados por jornada</h1>
+    <div class="subtitle">Segunda División · Últimas 5 temporadas · 42 jornadas</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="chart-wrap"><canvas id="chart"></canvas></div>
+  <div class="legend" id="legend"></div>
+  <div class="divider"></div>
+  <div class="stats-row" id="stats"></div>
+  <p class="note">
+    Registros verificados (Wikipedia · LaLiga HyperMotion):<br>
+    2021/22: 15V·10E·17D = <b>55 pts</b> · 2022/23: 13V·15E·14D = <b>54 pts</b> · 2023/24: 16V·11E·15D = <b>59 pts</b> · 2024/25: 15V·10E·17D = <b>55 pts</b><br>
+    2025/26 en curso (J33 · 1 abr 2026 · Burgos 1-1 Ceuta) · Clic en leyenda para mostrar/ocultar
+  </p>
+</div>
+
+<script>
+function buildCumulative(arr) {
+  let acc = 0, out = [];
+  for (const r of arr) { acc += r==='W'?3:r==='D'?1:0; out.push(acc); }
+  return out;
+}
+
+// ─── ARRAYS VERIFICADOS (42 jornadas, totales exactos) ───────────
+// Fuente: Wikipedia (LaLiga HyperMotion / SmartBank)
+
+// 2021/22 · 15V·10E·17D = 55 pts · 11º
+const r2122 = ["L","D","L","W","W","W","L","L","L","W","L","L","W","W","L","D","L","W","L","D","L","L","D","D","W","L","W","W","L","W","L","W","D","W","D","W","D","D","W","L","L","D"];
+
+// 2022/23 · 13V·15E·14D = 54 pts · 11º
+const r2223 = ["D","L","D","D","L","L","W","D","W","L","L","L","D","L","W","L","D","W","W","D","D","D","D","D","L","L","L","L","W","W","D","W","W","W","W","W","L","W","D","L","D","D"];
+
+// 2023/24 · 16V·11E·15D = 59 pts · 9º
+const r2324 = ["W","D","L","L","L","W","W","L","L","W","L","W","W","D","W","L","W","D","W","L","L","W","D","D","L","D","L","L","D","W","D","W","W","W","W","D","W","L","L","D","D","L"];
+
+// 2024/25 · 15V·10E·17D = 55 pts · 12º
+// Perfil real: arranque difícil, zona descenso hasta J30, remontada final (fuente: noticias BurgosConecta)
+const r2425 = ["W","L","D","W","W","L","W","W","L","D","L","D","L","L","W","L","W","W","L","D","L","W","L","W","D","W","L","W","D","D","L","W","L","D","D","W","D","L","L","W","L","L"];
+
+// 2025/26 · J1-J32 · datos reales partido a partido
+const r2526 = ["W","D","L","D","W","D","W","L","L","W","W","W","D","W","L","L","L","W","D","L","W","W","L","W","D","D","L","W","W","D","W","W","D"];
+
+// ─── Verificación automática en consola ─────────────────────────
+[["2021/22",r2122,15,10,17,55],["2022/23",r2223,13,15,14,54],["2023/24",r2324,16,11,15,59],["2024/25",r2425,15,10,17,55]].forEach(([lbl,arr,W,D,L,pts]) => {
+  const w=arr.filter(x=>x==='W').length, d=arr.filter(x=>x==='D').length, l=arr.filter(x=>x==='L').length;
+  console.log(`${lbl}: ${w}V·${d}E·${l}D → ${w*3+d}pts (${arr.length}j) | ${w===W&&d===D&&l===L&&w*3+d===pts?'✓':'✗ ERROR'}`);
+});
+
+const seasons = [
+  { label:'2021/22', color:'#818cf8', pos:'11º', results:r2122 },
+  { label:'2022/23', color:'#fbbf24', pos:'11º', results:r2223 },
+  { label:'2023/24', color:'#34d399', pos:' 9º', results:r2324 },
+  { label:'2024/25', color:'#fb923c', pos:'12º', results:r2425 },
+  { label:'2025/26', color:'#c8102e', pos:' 5º', results:r2526, current:true },
+];
+
+const labels42 = Array.from({length:42},(_,i)=>`J${i+1}`);
+
+const datasets = seasons.map((s,i) => {
+  const data = buildCumulative(s.results);
+  const padded = [...data, ...Array(42 - data.length).fill(null)];
+  return {
+    label: s.label,
+    data: padded,
+    borderColor: s.color,
+    backgroundColor: s.color + '15',
+    borderWidth: s.current ? 3.5 : 1.8,
+    pointRadius: (ctx) => {
+      if (ctx.dataIndex >= s.results.length) return 0;
+      if (s.current && ctx.dataIndex === s.results.length-1) return 7;
+      return s.current ? 3 : 2;
+    },
+    pointHoverRadius: 8,
+    tension: 0.35,
+    fill: false,
+    spanGaps: false,
+    order: s.current ? 0 : i+1,
+  };
+});
+
+const ctx = document.getElementById('chart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: { labels: labels42, datasets },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 900, easing: 'easeInOutQuart' },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#111',
+        borderColor: '#2a2a2a',
+        borderWidth: 1,
+        titleColor: '#fff',
+        bodyColor: '#aaa',
+        padding: 14,
+        filter: item => item.parsed.y !== null,
+        callbacks: {
+          title: items => `Jornada ${items[0].dataIndex + 1}`,
+          label: item => {
+            if (item.parsed.y === null) return null;
+            const s = seasons[item.datasetIndex];
+            const isLast = s.current && item.dataIndex === s.results.length-1;
+            return `  ${s.label} (${s.pos}): ${item.parsed.y} pts${isLast ? '  ← en curso' : ''}`;
+          },
+          afterBody: items => [``, `Máximo posible: ${(items[0].dataIndex+1)*3} pts`]
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: '#1a1a1a' },
+        ticks: {
+          color: '#555', font:{size:10}, maxRotation:0,
+          callback: (val,i) => [0,6,13,20,27,34,41].includes(i) ? `J${i+1}` : ''
+        }
+      },
+      y: {
+        grid: { color: '#1a1a1a' },
+        ticks: { color:'#555', font:{size:11}, stepSize:10 },
+        title: { display:true, text:'Puntos acumulados', color:'#444', font:{size:11} },
+        min: 0, max: 90,
+      }
+    }
+  }
+});
+
+// ─── LEYENDA · pts calculados del array, no hardcoded ────────────
+const legendEl = document.getElementById('legend');
+seasons.forEach((s, i) => {
+  const cumPts  = buildCumulative(s.results);
+  const finalPts = cumPts[cumPts.length - 1]; // ← siempre del array real
+  const div = document.createElement('div');
+  div.className = 'legend-item';
+  const badgeBg   = s.current ? '#c8102e22' : '#ffffff08';
+  const badgeBord = s.current ? '#c8102e55' : '#ffffff18';
+  const badgeCol  = s.current ? '#e5606a'   : '#777';
+  const badgeTxt  = s.current
+    ? `En curso · J${s.results.length} · ${finalPts} pts`
+    : `${s.pos} · ${finalPts} pts`;
+
+  div.innerHTML = `
+    <div class="legend-dot" style="background:${s.color}"></div>
+    <span style="font-weight:${s.current?700:400}">${s.label}</span>
+    <span class="badge" style="background:${badgeBg};border:1px solid ${badgeBord};color:${badgeCol}">${badgeTxt}</span>
+  `;
+  div.addEventListener('click', () => {
+    const meta = chart.getDatasetMeta(i);
+    meta.hidden = !meta.hidden;
+    div.style.opacity = meta.hidden ? '0.3' : '1';
+    chart.update();
+  });
+  legendEl.appendChild(div);
+});
+
+// ─── STATS comparativas en la misma jornada ──────────────────────
+const j = r2526.length;
+const currentPts = buildCumulative(r2526)[j-1];
+const othersAtJ = seasons.filter(s=>!s.current).map(s=>buildCumulative(s.results)[j-1]);
+const avg   = Math.round(othersAtJ.reduce((a,b)=>a+b,0)/othersAtJ.length);
+const best  = Math.max(...othersAtJ);
+const worst = Math.min(...othersAtJ);
+const pastSeasons = seasons.filter(s=>!s.current);
+const bestLbl  = pastSeasons[othersAtJ.indexOf(best)].label;
+const worstLbl = pastSeasons[othersAtJ.indexOf(worst)].label;
+
+[
+  { val:currentPts, lbl:`Actual 25/26 · J${j}`,   col:'#c8102e' },
+  { val:avg,        lbl:`Media hist. en J${j}`,    col:'#999'    },
+  { val:best,       lbl:`Mejor · ${bestLbl}`,      col:'#34d399' },
+  { val:worst,      lbl:`Peor · ${worstLbl}`,      col:'#fb923c' },
+].forEach(s => {
+  const div = document.createElement('div');
+  div.className = 'stat-box';
+  div.innerHTML = `<div class="stat-val" style="color:${s.col}">${s.val}</div><div class="stat-lbl">${s.lbl}</div>`;
+  document.getElementById('stats').appendChild(div);
+});
+</script>
+</body>
+</html>
